@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Tienda Zancudoss cp</title>
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="header">
+    <h1 class="logo">Tienda de Kass 🛍️</h1>
+
+    <div class="view-switch">
+      <button id="btn-vista-cliente" class="view-btn active">
+        Vista cliente
+      </button>
+      <button id="btn-vista-vendedor" class="view-btn">
+        Vista vendedor
+      </button>
+    </div>
+  </header>
+
+  <!-- 🌸 VISTA CLIENTE -->
+  <main id="vista-cliente" class="layout">
+    <!-- Catálogo de productos -->
+    <section class="catalogo">
+      <h2>Productos</h2>
+      <div id="lista-productos" class="productos-grid">
+        <!-- Aquí se llenan las tarjetas con JS -->
+      </div>
+    </section>
+
+    <!-- Carrito -->
+    <aside class="carrito">
+      <h2>Carrito</h2>
+      <div id="lista-carrito" class="carrito-items">
+        <p class="carrito-vacio">Tu carrito está vacío.</p>
+      </div>
+      <div class="carrito-total">
+        <span>Total:</span>
+        <strong id="total-carrito">$0.00</strong>
+      </div>
+      <button id="btn-vaciar" class="btn-secondary">Vaciar carrito</button>
+    </aside>
+  </main>
+
+  <section id="cliente-datos" class="cliente-section">
+    <h2>Tus datos</h2>
+    <form id="form-cliente" class="form-cliente">
+      <div class="field">
+        <label for="nombre">Nombre</label>
+        <input type="text" id="nombre" required>
+      </div>
+      <div class="field">
+        <label for="direccion">Dirección</label>
+        <input type="text" id="direccion">
+      </div>
+      <div class="field">
+        <label for="telefono">Teléfono</label>
+        <input type="text" id="telefono">
+      </div>
+      <div class="field">
+        <label for="correo">Correo</label>
+        <input type="email" id="correo">
+      </div>
+
+      <button type="submit" class="btn-primary">
+        Confirmar compra
+      </button>
+    </form>
+  </section>
+
+  <!-- 🧾 VISTA VENDEDOR -->
+  <main id="vista-vendedor" class="layout hidden">
+    <aside class="panel-menu">
+      <h2>Panel vendedor</h2>
+      <ul>
+        <li class="menu-item activo" data-section="sec-resumen">Resumen</li>
+        <li class="menu-item" data-section="sec-productos">Productos</li>
+        <li class="menu-item" data-section="sec-clientes">Clientes</li>
+        <li class="menu-item" data-section="sec-ventas">Ventas</li>
+      </ul>
+    </aside>
+
+    <section class="panel-contenido">
+      <!-- Resumen -->
+      <div id="sec-resumen" class="panel-section">
+        <h2>Resumen general</h2>
+        <div class="cards-resumen">
+          <article class="card-resumen">
+            <span class="label">Ventas hoy</span>
+            <strong>$1,250.00</strong>
+          </article>
+          <article class="card-resumen">
+            <span class="label">Clientes registrados</span>
+            <strong>24</strong>
+          </article>
+          <article class="card-resumen">
+            <span class="label">Productos activos</span>
+            <strong>8</strong>
+          </article>
+        </div>
+      </div>
+
+      <!-- Productos -->
+      <div id="sec-productos" class="panel-section hidden">
+        <h2>Productos</h2>
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre</th>
+              <th>Tipo</th>
+              <th>Precio</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-productos">
+            <!-- Datos de ejemplo, luego se rellenan con JS/backend -->
+            <tr>
+              <td>1</td>
+              <td>Jugo Verde Detox</td>
+              <td>líquido</td>
+              <td>$45.00</td>
+              <td><button class="btn-small">Editar</button></td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>Smoothie de Fresa</td>
+              <td>líquido</td>
+              <td>$40.00</td>
+              <td><button class="btn-small">Editar</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Clientes -->
+      <div id="sec-clientes" class="panel-section hidden">
+        <h2>Clientes</h2>
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre</th>
+              <th>Teléfono</th>
+              <th>Correo</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-clientes">
+            <tr>
+              <td>1</td>
+              <td>Ana López</td>
+              <td>555-123-4567</td>
+              <td>ana@example.com</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>Luis Pérez</td>
+              <td>555-987-6543</td>
+              <td>luis@example.com</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Ventas -->
+      <div id="sec-ventas" class="panel-section hidden">
+        <h2>Ventas</h2>
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Fecha</th>
+              <th>Cliente</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-ventas">
+            <tr>
+              <td>1</td>
+              <td>2025-12-01</td>
+              <td>Ana López</td>
+              <td>$85.00</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>2025-12-01</td>
+              <td>Luis Pérez</td>
+              <td>$320.00</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- JS -->
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
