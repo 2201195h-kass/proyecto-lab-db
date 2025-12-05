@@ -1,6 +1,7 @@
 // js/app.js
 
 let carrito = [];
+let carritoCargado = false;
 
 function formatearPrecio(valor) {
   return `$${valor.toFixed(2)}`;
@@ -12,62 +13,113 @@ function formatearPrecio(valor) {
 
 async function renderProductos() {
   const contenedor = document.getElementById("lista-productos");
-  const productos = await obtenerProductos(); // 👈 IMPORTANTE: ESTA
+  try {
+    const productos = await obtenerProductos();
 
-  contenedor.innerHTML = productos
-    .map((p) => {
-      return `
-      <article class="card-producto">
-        <h3>${p.nombre_producto}</h3>
-        <p class="tipo">${p.tipo_producto}</p>
-        <p>${p.descripcion}</p>
-        <p class="precio">${formatearPrecio(p.precio)}</p>
-        <div class="card-footer">
-          <button class="btn-small" onclick="agregarAlCarrito(${p.id_producto})">
-            Agregar
-          </button>
-        </div>
-      </article>
-    `;
-    })
-    .join("");
+    contenedor.innerHTML = productos
+      .map((p) => {
+        const stockInfo = p.stock !== undefined ? `<span class="stock">Stock: ${p.stock}</span>` : '';
+        const imagen = p.imagen_url ? `<img src="${p.imagen_url}" alt="${p.nombre_producto}" class="producto-imagen">` : '';
+        return `
+        <article class="card-producto">
+          ${imagen}
+          <h3>${p.nombre_producto}</h3>
+          <p class="tipo">${p.tipo_producto}</p>
+          <p>${p.descripcion}</p>
+          ${stockInfo}
+          <p class="precio">${formatearPrecio(p.precio)}</p>
+          <div class="card-footer">
+            <button class="btn-small" onclick="agregarAlCarritoFrontend(${p.id_producto})" 
+                    ${p.stock !== undefined && p.stock === 0 ? 'disabled' : ''}>
+              ${p.stock !== undefined && p.stock === 0 ? 'Sin stock' : 'Agregar'}
+            </button>
+          </div>
+        </article>
+      `;
+      })
+      .join("");
+  } catch (error) {
+    console.error('Error al cargar productos:', error);
+    contenedor.innerHTML = '<p>Error al cargar productos. Por favor, recarga la página.</p>';
+  }
 }
-async function agregarAlCarrito(idProducto) {
-  const productos = await obtenerProductos();
-  const producto = productos.find((p) => p.id_producto === idProducto);
-  if (!producto) return;
 
-  const existente = carrito.find((item) => item.id_producto === idProducto);
-
-  if (existente) {
-    existente.cantidad += 1;
-  } else {
-    carrito.push({
-      id_producto: producto.id_producto,
-      nombre: producto.nombre_producto,
-      precio: producto.precio,
-      cantidad: 1
-    });
+async function cargarCarritoDesdeAPI() {
+  if (!window.estaAutenticado || !window.estaAutenticado()) {
+    return;
   }
 
-  renderCarrito();
+  try {
+    const items = await obtenerCarrito();
+    carrito = items.map(item => ({
+      id_producto: item.id_producto,
+      nombre: item.nombre_producto,
+      precio: parseFloat(item.precio_actual || item.precio),
+      cantidad: item.cantidad
+    }));
+    carritoCargado = true;
+    renderCarrito();
+  } catch (error) {
+    console.error('Error al cargar carrito:', error);
+    carritoCargado = true; // Marcar como cargado para evitar loops
+  }
 }
 
-function quitarDelCarrito(idProducto) {
-  carrito = carrito.filter((item) => item.id_producto !== idProducto);
-  renderCarrito();
+async function agregarAlCarrito(idProducto) {
+  // Verificar autenticación
+  if (!window.estaAutenticado || !window.estaAutenticado()) {
+    alert('Por favor, inicia sesión para agregar productos al carrito');
+    return;
+  }
+
+  try {
+    // Usar la función del módulo api.js
+    await agregarAlCarrito(idProducto, 1);
+    
+    // Recargar carrito desde API
+    await cargarCarritoDesdeAPI();
+  } catch (error) {
+    alert('Error al agregar al carrito: ' + error.message);
+  }
 }
 
-function cambiarCantidad(idProducto, delta) {
+async function quitarDelCarrito(idProducto) {
+  if (!window.estaAutenticado || !window.estaAutenticado()) {
+    carrito = carrito.filter((item) => item.id_producto !== idProducto);
+    renderCarrito();
+    return;
+  }
+
+  try {
+    await eliminarDelCarrito(idProducto);
+    await cargarCarritoDesdeAPI();
+  } catch (error) {
+    alert('Error al eliminar del carrito: ' + error.message);
+  }
+}
+
+async function cambiarCantidad(idProducto, delta) {
   const item = carrito.find((i) => i.id_producto === idProducto);
   if (!item) return;
 
-  item.cantidad += delta;
-  if (item.cantidad <= 0) {
-    carrito = carrito.filter((i) => i.id_producto !== idProducto);
+  const nuevaCantidad = item.cantidad + delta;
+  
+  if (nuevaCantidad <= 0) {
+    await quitarDelCarrito(idProducto);
+    return;
   }
 
-  renderCarrito();
+  if (window.estaAutenticado && window.estaAutenticado()) {
+    try {
+      await actualizarCantidadCarrito(idProducto, nuevaCantidad);
+      await cargarCarritoDesdeAPI();
+    } catch (error) {
+      alert('Error al actualizar cantidad: ' + error.message);
+    }
+  } else {
+    item.cantidad = nuevaCantidad;
+    renderCarrito();
+  }
 }
 
 function renderCarrito() {
@@ -107,13 +159,29 @@ function renderCarrito() {
   totalSpan.textContent = formatearPrecio(total);
 }
 
-function vaciarCarrito() {
-  carrito = [];
-  renderCarrito();
+async function vaciarCarrito() {
+  if (window.estaAutenticado && window.estaAutenticado()) {
+    try {
+      await vaciarCarritoAPI();
+      carrito = [];
+      renderCarrito();
+    } catch (error) {
+      alert('Error al vaciar carrito: ' + error.message);
+    }
+  } else {
+    carrito = [];
+    renderCarrito();
+  }
 }
 
 async function manejarFormularioCliente(event) {
   event.preventDefault();
+
+  // Verificar autenticación
+  if (!window.estaAutenticado || !window.estaAutenticado()) {
+    alert('Por favor, inicia sesión para realizar una compra');
+    return;
+  }
 
   const nombre = document.getElementById("nombre").value.trim();
   const direccion = document.getElementById("direccion").value.trim();
@@ -137,15 +205,20 @@ async function manejarFormularioCliente(event) {
 
   try {
     const respuesta = await registrarVenta(datos);
-    console.log("Respuesta backend / mock:", respuesta);
+    console.log("Respuesta backend:", respuesta);
 
-    alert("Compra registrada (simulada). Más adelante esto se guardará en la BD.");
+    alert(`¡Compra registrada exitosamente! ID de venta: ${respuesta.id_venta || respuesta.venta?.id_venta || 'N/A'}`);
 
-    vaciarCarrito();
+    await vaciarCarrito();
     document.getElementById("form-cliente").reset();
+    
+    // Recargar ventas si estamos en vista vendedor
+    if (document.getElementById("vista-vendedor") && !document.getElementById("vista-vendedor").classList.contains("hidden")) {
+      await renderVentas();
+    }
   } catch (err) {
     console.error(err);
-    alert("Ocurrió un error al registrar la compra.");
+    alert("Ocurrió un error al registrar la compra: " + err.message);
   }
 }
 
@@ -153,10 +226,92 @@ async function manejarFormularioCliente(event) {
 // INICIALIZACIÓN: un solo DOMContentLoaded
 // ---------------------------------------------------------------------------
 
-document.addEventListener("DOMContentLoaded", () => {
+// ---------------------------------------------------------------------------
+// VENDEDOR: renderizado de datos
+// ---------------------------------------------------------------------------
+
+async function renderVentas() {
+  try {
+    const ventas = await obtenerVentas();
+    const tbody = document.getElementById("tabla-ventas");
+    if (!tbody) return;
+
+    tbody.innerHTML = ventas
+      .map((v) => {
+        const fecha = new Date(v.fecha_venta).toLocaleDateString();
+        return `
+        <tr>
+          <td>${v.id_venta}</td>
+          <td>${fecha}</td>
+          <td>${v.nombre_cliente || 'N/A'}</td>
+          <td>${formatearPrecio(parseFloat(v.total))}</td>
+          <td><button class="btn-small" onclick="verDetalleVenta(${v.id_venta})">Ver</button></td>
+        </tr>
+      `;
+      })
+      .join("");
+  } catch (error) {
+    console.error('Error al cargar ventas:', error);
+  }
+}
+
+async function renderClientes() {
+  try {
+    const clientes = await obtenerClientes();
+    const tbody = document.getElementById("tabla-clientes");
+    if (!tbody) return;
+
+    tbody.innerHTML = clientes
+      .map((c) => {
+        return `
+        <tr>
+          <td>${c.id_cliente}</td>
+          <td>${c.nombre_cliente}</td>
+          <td>${c.telefono || 'N/A'}</td>
+          <td>${c.correo || c.correo_usuario || 'N/A'}</td>
+        </tr>
+      `;
+      })
+      .join("");
+  } catch (error) {
+    console.error('Error al cargar clientes:', error);
+  }
+}
+
+async function renderResumen() {
+  try {
+    const resumen = await obtenerResumen();
+    const cards = document.querySelectorAll('.card-resumen');
+    
+    if (cards.length >= 3) {
+      cards[0].querySelector('strong').textContent = formatearPrecio(resumen.ventas_hoy.ingresos);
+      cards[1].querySelector('strong').textContent = resumen.clientes_registrados;
+      cards[2].querySelector('strong').textContent = resumen.productos_activos;
+    }
+  } catch (error) {
+    console.error('Error al cargar resumen:', error);
+  }
+}
+
+async function verDetalleVenta(id) {
+  try {
+    const venta = await obtenerVenta(id);
+    alert(`Venta #${venta.id_venta}\nCliente: ${venta.nombre_cliente}\nTotal: ${formatearPrecio(venta.total)}\nFecha: ${new Date(venta.fecha_venta).toLocaleString()}`);
+  } catch (error) {
+    alert('Error al obtener detalle de venta: ' + error.message);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
   // CLIENTE
-  renderProductos();
-  renderCarrito();
+  await renderProductos();
+  
+  // Cargar carrito si está autenticado
+  if (window.estaAutenticado && window.estaAutenticado()) {
+    await cargarCarritoDesdeAPI();
+  } else {
+    renderCarrito();
+  }
 
   document
     .getElementById("btn-vaciar")
@@ -199,16 +354,41 @@ document.addEventListener("DOMContentLoaded", () => {
   const sections = document.querySelectorAll(".panel-section");
 
   menuItems.forEach((item) => {
-    item.addEventListener("click", () => {
+    item.addEventListener("click", async () => {
       const id = item.getAttribute("data-section");
 
       menuItems.forEach((m) => m.classList.remove("activo"));
       item.classList.add("activo");
 
       sections.forEach((sec) => {
-        if (sec.id === id) sec.classList.remove("hidden");
-        else sec.classList.add("hidden");
+        if (sec.id === id) {
+          sec.classList.remove("hidden");
+          // Cargar datos cuando se muestra la sección
+          if (id === 'sec-ventas') {
+            renderVentas();
+          } else if (id === 'sec-clientes') {
+            renderClientes();
+          } else if (id === 'sec-resumen') {
+            renderResumen();
+          } else if (id === 'sec-productos') {
+            renderProductos();
+          }
+        } else {
+          sec.classList.add("hidden");
+        }
       });
     });
   });
+
+  // Cargar resumen inicial si estamos en vista vendedor
+  if (document.getElementById("vista-vendedor") && 
+      !document.getElementById("vista-vendedor").classList.contains("hidden")) {
+    await renderResumen();
+    await renderVentas();
+    await renderClientes();
+  }
 });
+
+// Exportar funciones globales
+window.verDetalleVenta = verDetalleVenta;
+window.agregarAlCarritoFrontend = agregarAlCarritoFrontend;
