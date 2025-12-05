@@ -28,7 +28,7 @@ export const obtenerProductos = async (req, res) => {
       paramCount++;
     }
 
-    query += ' ORDER BY fecha_creacion DESC';
+    query += ' ORDER BY id_producto ASC';
 
     const result = await pool.query(query, params);
     res.json(result.rows);

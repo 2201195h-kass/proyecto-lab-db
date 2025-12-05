@@ -11,7 +11,8 @@ export const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Token de acceso requerido' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  const secret = process.env.JWT_SECRET || 'default_secret_key_cambiar_en_produccion';
+  jwt.verify(token, secret, (err, user) => {
     if (err) {
       return res.status(403).json({ error: 'Token inválido o expirado' });
     }
@@ -39,7 +40,8 @@ export const optionalAuth = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (token) {
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    const secret = process.env.JWT_SECRET || 'default_secret_key_cambiar_en_produccion';
+    jwt.verify(token, secret, (err, user) => {
       if (!err) {
         req.user = user;
       }

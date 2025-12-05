@@ -5,9 +5,12 @@ dotenv.config();
 
 const { Pool } = pkg;
 
+// Configuración de conexión a PostgreSQL
+// Valores por defecto coinciden con docker-compose.yml
+// Si usas docker-compose, NO necesitas crear .env para la BD
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
+  port: parseInt(process.env.DB_PORT) || 5432,
   database: process.env.DB_NAME || 'tienda_productos',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',

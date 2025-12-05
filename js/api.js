@@ -31,13 +31,27 @@ async function fetchAPI(endpoint, options = {}) {
   };
 
   try {
+    // Verificar que el token esté disponible antes de hacer la petición
+    const token = getAuthToken();
+    if (!token && endpoint !== '/auth/login' && endpoint !== '/auth/register') {
+      console.warn('No hay token disponible para:', endpoint);
+    }
+    
     const response = await fetch(url, config);
     
     // Si no está autorizado, limpiar token y redirigir
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      console.error('Error 401: Token inválido o expirado');
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
-      window.location.href = '#login';
+      if (window.eliminarUsuario) window.eliminarUsuario();
+      throw new Error('Token de acceso requerido. Por favor, inicia sesión nuevamente.');
+    }
+    
+    if (response.status === 403) {
+      console.error('Error 403: Sin permisos');
+      const error = await response.json().catch(() => ({ error: 'No tienes permisos para esta acción' }));
+      throw new Error(error.error || 'No tienes permisos para esta acción');
     }
 
     if (!response.ok) {
@@ -48,6 +62,13 @@ async function fetchAPI(endpoint, options = {}) {
     return await response.json();
   } catch (error) {
     console.error('Error en fetchAPI:', error);
+    console.error('URL intentada:', url);
+    
+    // Mejorar mensajes de error
+    if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+      throw new Error(`No se puede conectar con el backend en ${API_BASE_URL}. Verifica que el servidor esté corriendo.`);
+    }
+    
     throw error;
   }
 }
@@ -107,29 +128,81 @@ function obtenerProductosMock() {
       id_producto: 1,
       nombre_producto: "Jugo Verde Detox",
       tipo_producto: "líquido",
-      descripcion: "Mezcla de frutas y verduras ideal para desintoxicar.",
-      precio: 45.0
+      descripcion: "Mezcla de frutas y verduras ideal para desintoxicar. Rico en antioxidantes y vitaminas.",
+      precio: 45.0,
+      stock: 50
     },
     {
       id_producto: 2,
       nombre_producto: "Smoothie de Fresa",
       tipo_producto: "líquido",
-      descripcion: "Bebida cremosa a base de fresa y yogurt.",
-      precio: 40.0
+      descripcion: "Bebida cremosa a base de fresa y yogurt natural. Fuente de probióticos.",
+      precio: 40.0,
+      stock: 30
     },
     {
       id_producto: 3,
-      nombre_producto: "Proteína en Polvo Vainilla",
-      tipo_producto: "polvo",
-      descripcion: "Suplemento de proteína sabor vainilla, ideal para batidos.",
-      precio: 320.0
+      nombre_producto: "Smoothie Tropical",
+      tipo_producto: "líquido",
+      descripcion: "Combinación de piña, mango y coco. Energía natural y refrescante.",
+      precio: 42.0,
+      stock: 35
     },
     {
       id_producto: 4,
+      nombre_producto: "Proteína en Polvo Vainilla",
+      tipo_producto: "polvo",
+      descripcion: "Suplemento de proteína sabor vainilla, ideal para batidos post-entrenamiento.",
+      precio: 320.0,
+      stock: 20
+    },
+    {
+      id_producto: 5,
+      nombre_producto: "Proteína en Polvo Chocolate",
+      tipo_producto: "polvo",
+      descripcion: "Proteína vegana sabor chocolate. Sin lactosa ni gluten.",
+      precio: 325.0,
+      stock: 18
+    },
+    {
+      id_producto: 6,
       nombre_producto: "Mix de Frutas Deshidratadas",
       tipo_producto: "otro",
-      descripcion: "Botana saludable con variedad de frutas deshidratadas.",
-      precio: 80.0
+      descripcion: "Botana saludable con variedad de frutas deshidratadas. Sin azúcar añadida.",
+      precio: 80.0,
+      stock: 40
+    },
+    {
+      id_producto: 7,
+      nombre_producto: "Nueces y Almendras Orgánicas",
+      tipo_producto: "otro",
+      descripcion: "Mezcla premium de nueces y almendras orgánicas. Fuente de grasas saludables.",
+      precio: 120.0,
+      stock: 30
+    },
+    {
+      id_producto: 8,
+      nombre_producto: "Té Verde Orgánico",
+      tipo_producto: "líquido",
+      descripcion: "Té verde premium con propiedades antioxidantes. Envase de 20 bolsitas.",
+      precio: 65.0,
+      stock: 35
+    },
+    {
+      id_producto: 9,
+      nombre_producto: "Aceite de Coco Virgen",
+      tipo_producto: "líquido",
+      descripcion: "Aceite de coco extra virgen prensado en frío. 500ml.",
+      precio: 95.0,
+      stock: 28
+    },
+    {
+      id_producto: 10,
+      nombre_producto: "Miel de Abeja Pura",
+      tipo_producto: "líquido",
+      descripcion: "Miel 100% natural sin procesar. Envase de 500g.",
+      precio: 85.0,
+      stock: 30
     }
   ];
 }
@@ -149,6 +222,18 @@ async function obtenerProducto(id) {
   }
 
   return await fetchAPI(`/productos/${id}`);
+}
+
+async function actualizarProducto(id, datos) {
+  if (USE_MOCK) {
+    console.log('Simulando actualizar producto:', id, datos);
+    return { message: 'Producto actualizado' };
+  }
+
+  return await fetchAPI(`/productos/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(datos)
+  });
 }
 
 // ============================================================================
@@ -219,27 +304,6 @@ async function registrarVenta(datosVenta) {
     return { ok: true, id_venta: 123 };
   }
 
-  // Obtener id_cliente del usuario autenticado
-  const perfil = await obtenerPerfil();
-  const clienteResult = await fetchAPI(`/clientes?usuario=${perfil.id_usuario}`);
-  
-  let id_cliente;
-  if (clienteResult.length > 0) {
-    id_cliente = clienteResult[0].id_cliente;
-  } else {
-    // Crear cliente si no existe
-    const clienteCreado = await fetchAPI('/clientes', {
-      method: 'POST',
-      body: JSON.stringify({
-        nombre_cliente: datosVenta.cliente.nombre,
-        direccion: datosVenta.cliente.direccion,
-        telefono: datosVenta.cliente.telefono,
-        correo: datosVenta.cliente.correo
-      })
-    });
-    id_cliente = clienteCreado.id_cliente;
-  }
-
   // Preparar items para la venta
   const items = datosVenta.carrito.map(item => ({
     id_producto: item.id_producto,
@@ -247,10 +311,13 @@ async function registrarVenta(datosVenta) {
     precio_unitario: item.precio
   }));
 
+  // El backend manejará automáticamente la obtención/creación del cliente
+  // para usuarios con rol 'cliente'
   const ventaData = {
-    id_cliente,
-    metodo_pago: 'efectivo',
-    items
+    metodo_pago: datosVenta.metodo_pago || 'efectivo',
+    items,
+    // Incluir datos del cliente para que el backend pueda crear/actualizar el registro
+    cliente: datosVenta.cliente
   };
 
   return await fetchAPI('/ventas', {
@@ -275,6 +342,12 @@ async function obtenerVentas() {
         total: 320.0
       }
     ];
+  }
+
+  // Verificar autenticación
+  const usuario = window.getUsuarioActual ? window.getUsuarioActual() : null;
+  if (!usuario) {
+    throw new Error('Debes estar autenticado para ver ventas.');
   }
 
   return await fetchAPI('/ventas');
@@ -314,6 +387,12 @@ async function obtenerClientes() {
         correo: "luis@example.com"
       }
     ];
+  }
+
+  // Verificar que el usuario tenga permisos de vendedor
+  const usuario = window.getUsuarioActual ? window.getUsuarioActual() : null;
+  if (!usuario || (usuario.rol !== 'vendedor' && usuario.rol !== 'admin')) {
+    throw new Error('No tienes permisos para ver clientes. Se requiere rol de vendedor o admin.');
   }
 
   return await fetchAPI('/clientes');

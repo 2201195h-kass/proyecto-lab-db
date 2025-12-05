@@ -122,22 +122,101 @@ export const crearVenta = async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    const { id_cliente, metodo_pago, items } = req.body;
+    const { id_cliente, metodo_pago, items, cliente: datosCliente } = req.body;
     const id_vendedor = req.user.rol !== 'cliente' ? req.user.id_usuario : null;
 
-    // Verificar que el cliente existe
-    const clienteCheck = await client.query(
-      'SELECT id_cliente FROM clientes WHERE id_cliente = $1',
-      [id_cliente]
-    );
+    let id_cliente_final = id_cliente;
 
-    if (clienteCheck.rows.length === 0) {
+    // Si el usuario es cliente, obtener o crear su registro de cliente
+    if (req.user.rol === 'cliente') {
+      // Buscar si ya existe un registro de cliente para este usuario
+      const clienteExistente = await client.query(
+        'SELECT id_cliente FROM clientes WHERE id_usuario = $1',
+        [req.user.id_usuario]
+      );
+
+      if (clienteExistente.rows.length > 0) {
+        id_cliente_final = clienteExistente.rows[0].id_cliente;
+        
+        // Actualizar datos del cliente si se proporcionaron
+        if (datosCliente) {
+          const updates = [];
+          const params = [];
+          let paramCount = 1;
+
+          if (datosCliente.nombre) {
+            updates.push(`nombre_cliente = $${paramCount++}`);
+            params.push(datosCliente.nombre);
+          }
+          if (datosCliente.direccion) {
+            updates.push(`direccion = $${paramCount++}`);
+            params.push(datosCliente.direccion);
+          }
+          if (datosCliente.telefono) {
+            updates.push(`telefono = $${paramCount++}`);
+            params.push(datosCliente.telefono);
+          }
+          if (datosCliente.correo) {
+            updates.push(`correo = $${paramCount++}`);
+            params.push(datosCliente.correo);
+          }
+
+          if (updates.length > 0) {
+            params.push(id_cliente_final);
+            await client.query(
+              `UPDATE clientes SET ${updates.join(', ')} WHERE id_cliente = $${paramCount}`,
+              params
+            );
+          }
+        }
+      } else {
+        // Crear nuevo registro de cliente
+        const nombreCliente = datosCliente?.nombre || req.user.nombre_usuario || 'Cliente';
+        const nuevoCliente = await client.query(
+          `INSERT INTO clientes (id_usuario, nombre_cliente, direccion, telefono, correo)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING id_cliente`,
+          [
+            req.user.id_usuario,
+            nombreCliente,
+            datosCliente?.direccion || null,
+            datosCliente?.telefono || null,
+            datosCliente?.correo || req.user.correo || null
+          ]
+        );
+        id_cliente_final = nuevoCliente.rows[0].id_cliente;
+      }
+    } else {
+      // Si es vendedor/admin, verificar que el cliente existe
+      if (!id_cliente_final) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'id_cliente es requerido para vendedores' });
+      }
+
+      const clienteCheck = await client.query(
+        'SELECT id_cliente FROM clientes WHERE id_cliente = $1',
+        [id_cliente_final]
+      );
+
+      if (clienteCheck.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Cliente no encontrado' });
+      }
+    }
+
+    // Validar que hay items
+    if (!items || !Array.isArray(items) || items.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Cliente no encontrado' });
+      return res.status(400).json({ error: 'Debe incluir al menos un producto en la venta' });
     }
 
     // Verificar stock y precios
     for (const item of items) {
+      if (!item.id_producto || !item.cantidad) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Cada item debe tener id_producto y cantidad' });
+      }
+
       const producto = await client.query(
         'SELECT precio, stock FROM productos WHERE id_producto = $1 AND activo = true',
         [item.id_producto]
@@ -151,21 +230,24 @@ export const crearVenta = async (req, res) => {
       if (producto.rows[0].stock < item.cantidad) {
         await client.query('ROLLBACK');
         return res.status(400).json({ 
-          error: `Stock insuficiente para el producto ${item.id_producto}` 
+          error: `Stock insuficiente para el producto ${item.id_producto}. Stock disponible: ${producto.rows[0].stock}` 
         });
       }
 
       // Usar precio actual del producto si no se especifica
       if (!item.precio_unitario) {
-        item.precio_unitario = producto.rows[0].precio;
+        item.precio_unitario = parseFloat(producto.rows[0].precio);
+      } else {
+        item.precio_unitario = parseFloat(item.precio_unitario);
       }
     }
 
     // Usar stored procedure para crear venta completa
+    // Orden de parámetros: id_cliente, items (JSONB), id_vendedor (opcional), metodo_pago (opcional)
     const itemsJson = JSON.stringify(items);
     const result = await client.query(
-      'SELECT crear_venta_completa($1, $2, $3, $4::jsonb) as id_venta',
-      [id_cliente, id_vendedor, metodo_pago, itemsJson]
+      'SELECT crear_venta_completa($1, $2::jsonb, $3, $4) as id_venta',
+      [id_cliente_final, itemsJson, id_vendedor || null, metodo_pago || null]
     );
 
     const id_venta = result.rows[0].id_venta;

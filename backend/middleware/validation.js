@@ -21,10 +21,8 @@ export const validateRegister = [
   body('password')
     .isLength({ min: 6 })
     .withMessage('La contraseña debe tener al menos 6 caracteres'),
-  body('rol')
-    .optional()
-    .isIn(['cliente', 'vendedor', 'admin'])
-    .withMessage('Rol inválido'),
+  // El campo 'rol' ya no es necesario en el registro público
+  // Todos los usuarios se registran como 'cliente' por defecto
   handleValidationErrors,
 ];
 
@@ -82,6 +80,7 @@ export const validateCliente = [
 // Validaciones para venta
 export const validateVenta = [
   body('id_cliente')
+    .optional()
     .isInt({ min: 1 })
     .withMessage('ID de cliente inválido'),
   body('items')
@@ -94,6 +93,7 @@ export const validateVenta = [
     .isInt({ min: 1 })
     .withMessage('La cantidad debe ser mayor a 0'),
   body('items.*.precio_unitario')
+    .optional()
     .isFloat({ min: 0 })
     .withMessage('El precio unitario debe ser positivo'),
   handleValidationErrors,

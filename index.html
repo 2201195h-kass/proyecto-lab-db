@@ -2,24 +2,145 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Tienda Zancudoss cp</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura Botánica - Bienestar Natural</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
 
   <!-- Estilos -->
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
   <header class="header">
-    <h1 class="logo">Tienda de Kass 🛍️</h1>
+    <h1 class="logo">Aura Botánica 🌿</h1>
 
-    <div class="view-switch">
-      <button id="btn-vista-cliente" class="view-btn active">
-        Vista cliente
-      </button>
-      <button id="btn-vista-vendedor" class="view-btn">
-        Vista vendedor
-      </button>
+    <div class="header-actions">
+      <!-- Sección de autenticación (cuando NO está logueado) -->
+      <div id="auth-section" class="auth-section">
+        <button id="btn-login-modal" class="btn-auth">Iniciar Sesión</button>
+        <button id="btn-registro-modal" class="btn-auth btn-primary">Registrarse</button>
+      </div>
+
+      <!-- Sección de usuario (cuando SÍ está logueado) -->
+      <div id="user-section" class="user-section hidden">
+        <span class="user-info">
+          <span id="user-name">Usuario</span>
+          <span class="role-tag" id="user-role">cliente</span>
+        </span>
+        <button id="btn-logout" class="btn-auth btn-secondary">Cerrar Sesión</button>
+      </div>
+
+      <div class="view-switch">
+        <button id="btn-vista-cliente" class="view-btn active">
+          Vista cliente
+        </button>
+        <button id="btn-vista-vendedor" class="view-btn hidden">
+          Administrar
+        </button>
+      </div>
     </div>
   </header>
+
+  <!-- Modal de Detalle de Venta -->
+  <div id="modal-detalle-venta" class="modal hidden">
+    <div class="modal-content modal-venta">
+      <span class="modal-close" onclick="cerrarModalDetalleVenta()">&times;</span>
+      <div class="venta-header">
+        <h2>Detalle de Venta</h2>
+        <div class="venta-id">Venta #<span id="venta-id-numero"></span></div>
+      </div>
+      <div class="venta-body">
+        <div class="venta-info-grid">
+          <div class="venta-info-item">
+            <div class="venta-label">Cliente</div>
+            <div class="venta-value" id="venta-cliente"></div>
+          </div>
+          <div class="venta-info-item">
+            <div class="venta-label">Fecha</div>
+            <div class="venta-value" id="venta-fecha"></div>
+          </div>
+          <div class="venta-info-item">
+            <div class="venta-label">Método de Pago</div>
+            <div class="venta-value" id="venta-metodo-pago"></div>
+          </div>
+          <div class="venta-info-item">
+            <div class="venta-label">Estado</div>
+            <div class="venta-value" id="venta-estado"></div>
+          </div>
+        </div>
+        <div class="venta-productos-section">
+          <h3>Productos</h3>
+          <div class="venta-productos-list" id="venta-productos-list">
+            <!-- Se llenará dinámicamente -->
+          </div>
+        </div>
+        <div class="venta-total-section">
+          <div class="venta-total">
+            <span class="venta-total-label">Total</span>
+            <span class="venta-total-amount" id="venta-total"></span>
+          </div>
+        </div>
+      </div>
+      <div class="venta-footer">
+        <button class="btn-primary" onclick="cerrarModalDetalleVenta()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Autenticación -->
+  <div id="auth-modal" class="modal hidden">
+    <div class="modal-content">
+      <span class="modal-close">&times;</span>
+      
+      <!-- Tabs Login/Registro -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login">Iniciar Sesión</button>
+        <button class="auth-tab" data-tab="registro">Registrarse</button>
+      </div>
+
+      <!-- Formulario de Login -->
+      <form id="form-login" class="auth-form">
+        <div class="field">
+          <label for="login-correo">Correo electrónico</label>
+          <input type="email" id="login-correo" required>
+        </div>
+        <div class="field">
+          <label for="login-password">Contraseña</label>
+          <input type="password" id="login-password" required>
+        </div>
+        <button type="submit" class="btn-primary">Iniciar Sesión</button>
+      </form>
+
+      <!-- Formulario de Registro -->
+      <form id="form-registro" class="auth-form hidden">
+        <div class="field">
+          <label for="reg-nombre">Nombre de usuario</label>
+          <input type="text" id="reg-nombre" required>
+        </div>
+        <div class="field">
+          <label for="reg-correo">Correo electrónico</label>
+          <input type="email" id="reg-correo" required>
+        </div>
+        <div class="field">
+          <label for="reg-password">Contraseña</label>
+          <input type="password" id="reg-password" required minlength="6">
+        </div>
+        <div class="field">
+          <label for="reg-codigo-vendedor">Código de Vendedor (Opcional)</label>
+          <input type="text" id="reg-codigo-vendedor" placeholder="Ingresa el código si eres vendedor">
+          <small class="field-hint">Solo necesario si quieres registrarte como vendedor</small>
+        </div>
+        <button type="submit" class="btn-primary">Registrarse</button>
+        <p class="registro-info">
+          Por defecto, tu cuenta será creada como <strong>Cliente</strong>. 
+          Si tienes un código de vendedor, ingrésalo arriba para obtener acceso de vendedor.
+        </p>
+      </form>
+    </div>
+  </div>
 
   <!-- 🌸 VISTA CLIENTE -->
   <main id="vista-cliente" class="layout">
@@ -113,7 +234,7 @@
               <th>Nombre</th>
               <th>Tipo</th>
               <th>Precio</th>
-              <th>Acciones</th>
+              <th>Stock/Estado</th>
             </tr>
           </thead>
           <tbody id="tabla-productos">

@@ -31,6 +31,9 @@ DB_PASSWORD=postgres
 JWT_SECRET=mi_secret_key_super_segura_cambiar_en_produccion_123456789
 JWT_EXPIRES_IN=7d
 
+# Código de Vendedor (para registro de vendedores)
+CODIGO_VENDEDOR=VENDEDOR2024
+
 # AWS S3 Configuration (opcional - dejar vacío si no se usa)
 AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=

@@ -6,9 +6,26 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const register = async (req, res) => {
-  const { nombre_usuario, correo, password, rol = 'cliente' } = req.body;
+  const { nombre_usuario, correo, password, codigo_vendedor } = req.body;
 
   try {
+    // SEGURIDAD: Por defecto todos los usuarios son 'cliente'
+    // Solo si se proporciona un código de vendedor válido, se puede registrar como 'vendedor'
+    let rolFinal = 'cliente';
+    
+    // Verificar código de vendedor si fue proporcionado
+    if (codigo_vendedor) {
+      const codigoValido = process.env.CODIGO_VENDEDOR || 'VENDEDOR2024';
+      
+      if (codigo_vendedor === codigoValido) {
+        rolFinal = 'vendedor';
+      } else {
+        return res.status(400).json({ 
+          error: 'Código de vendedor inválido. Si no eres vendedor, deja este campo vacío para registrarte como cliente.' 
+        });
+      }
+    }
+
     // Verificar si el correo ya existe
     const userExists = await pool.query(
       'SELECT id_usuario FROM usuarios WHERE correo = $1',
@@ -22,18 +39,18 @@ export const register = async (req, res) => {
     // Hash de la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Crear usuario
+    // Crear usuario - siempre como 'cliente' desde el registro público
     const result = await pool.query(
       `INSERT INTO usuarios (nombre_usuario, correo, password, rol)
        VALUES ($1, $2, $3, $4)
        RETURNING id_usuario, nombre_usuario, correo, rol`,
-      [nombre_usuario, correo, hashedPassword, rol]
+      [nombre_usuario, correo, hashedPassword, rolFinal]
     );
 
     const user = result.rows[0];
 
     // Si es cliente, crear registro en tabla clientes
-    if (rol === 'cliente') {
+    if (rolFinal === 'cliente') {
       await pool.query(
         `INSERT INTO clientes (id_usuario, nombre_cliente, correo)
          VALUES ($1, $2, $3)`,
@@ -42,9 +59,10 @@ export const register = async (req, res) => {
     }
 
     // Generar token JWT
+    const secret = process.env.JWT_SECRET || 'default_secret_key_cambiar_en_produccion';
     const token = jwt.sign(
       { id_usuario: user.id_usuario, correo: user.correo, rol: user.rol },
-      process.env.JWT_SECRET,
+      secret,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
@@ -92,9 +110,10 @@ export const login = async (req, res) => {
     }
 
     // Generar token JWT
+    const secret = process.env.JWT_SECRET || 'default_secret_key_cambiar_en_produccion';
     const token = jwt.sign(
       { id_usuario: user.id_usuario, correo: user.correo, rol: user.rol },
-      process.env.JWT_SECRET,
+      secret,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
